@@ -1,0 +1,214 @@
+-> Stacks
+{
+	TailWind,
+	HeroUI,
+	Poppins,
+	
+	React.Js -> Next.js  | Native 
+	  
+
+	Supa-base(Databse and Auth),
+	NodeMailer(to send credentials to employees for sign up), 	
+}
+
+
+->
+	** Employee(Requester) App (React.Native with Expo) **
+	Note: 
+		- we disable email confirmation <- Auth
+		- Row-Level-Security <- Table	
+
+
+-- Employees table to store employee information
+-- First, create a more comprehensive employees table *
+CREATE TABLE employees (
+    -- Admin-managed fields (set during registration)
+    id UUID PRIMARY KEY REFERENCES auth.users(id),
+    email TEXT UNIQUE NOT NULL,
+    employee_id TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    department TEXT NOT NULL,
+    position TEXT NOT NULL,
+    office_location TEXT NOT NULL,
+    date_joined DATE NOT NULL,
+    employment_status TEXT NOT NULL CHECK (employment_status IN ('Active', 'Resigned', 'On Leave', 'Terminated', 'Probation')),
+    
+    -- Employee-managed fields (updated on first login)
+    phone_number TEXT,
+    address TEXT,
+    profile_picture TEXT,
+    emergency_contact_name TEXT,
+    emergency_contact_phone TEXT,
+    preferred_language TEXT DEFAULT 'English',
+    notification_preferences JSONB DEFAULT '{"email": true, "sms": false, "push": true}'::jsonb,
+    
+    -- System fields
+    is_first_login BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create a table for user roles --
+CREATE TABLE user_roles (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id),
+    role TEXT NOT NULL CHECK (role IN ('employee', 'manager', 'admin', 'super_admin')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, role)
+);
+
+-- Assets table to store all company assets *
+CREATE TABLE assets (
+    asset_id SERIAL PRIMARY KEY,
+    asset_name TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    asset_category TEXT NOT NULL,
+    asset_code TEXT UNIQUE NOT NULL,
+    asset_SN TEXT UNIQUE NOT NULL,
+    description TEXT,
+
+    purchase_date DATE,
+    purchase_price DECIMAL(10, 2),
+    current_value DECIMAL(10, 2),
+
+    location TEXT,
+    assigned_to TEXT,
+    condition TEXT,
+    status TEXT CHECK (status IN ('Available', 'Assigned', 'Stored', 'Removed')) DEFAULT 'Available',        
+    notes TEXT,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+-- Asset requests table to track all requests *
+CREATE TABLE asset_requests (
+    request_id SERIAL PRIMARY KEY,
+    employee_id TEXT NOT NULL REFERENCES employees(employee_id),
+    asset_id INTEGER NOT NULL REFERENCES assets(asset_id),
+    request_date TIMESTAMPTZ DEFAULT NOW(),
+    purpose TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    expected_return_date DATE,
+    status TEXT CHECK (status IN ('Pending', 'Approved', 'Rejected', 'Cancelled', 'Returned')) DEFAULT 'Pending',
+    approver_id TEXT REFERENCES employees(employee_id),
+    approval_date TIMESTAMPTZ,
+    rejection_reason TEXT,
+    return_date TIMESTAMPTZ,
+    return_condition TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);`
+
+`-- Asset assignments table to track current and historical assignments
+CREATE TABLE asset_movement (
+    movement_id SERIAL PRIMARY KEY,
+    asset_id INTEGER NOT NULL REFERENCES assets(asset_id),
+    employee_id TEXT NOT NULL REFERENCES employees(employee_id),
+    request_id INTEGER NOT NULL REFERENCES asset_requests(request_id),
+    assigned_date TIMESTAMPTZ DEFAULT NOW(),
+    expected_return_date DATE,
+    actual_return_date TIMESTAMPTZ,
+    condition_on_assignment TEXT,
+    condition_on_return TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);  `
+
+-- Approval hierarchy table for managing who can approve what
+CREATE TABLE approval_hierarchy (
+    hierarchy_id SERIAL PRIMARY KEY,
+    department TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    approver_role TEXT NOT NULL,
+    max_value_limit DECIMAL(10, 2),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Notifications table for system notifications *
+CREATE TABLE notifications (
+    notification_id SERIAL PRIMARY KEY,
+    employee_id TEXT NOT NULL REFERENCES employees(employee_id),
+    request_id INTEGER REFERENCES asset_requests(request_id),
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Maintenance records table for tracking asset maintenance ------
+CREATE TABLE maintenance_records (
+    maintenance_id SERIAL PRIMARY KEY,
+    asset_id INTEGER NOT NULL REFERENCES assets(asset_id),
+    maintenance_type TEXT NOT NULL,
+    description TEXT,
+    maintenance_date DATE NOT NULL,
+    cost DECIMAL(10, 2),
+    performed_by TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+Key Relationships Explained:
+1. Employees to Asset Requests: One-to-many relationship. An employee can make multiple asset requests, but each request is made by one employee.
+2. Assets to Asset Requests: One-to-many relationship. An asset can be requested multiple times (though not simultaneously), but each request is for one specific asset.
+3. Asset Requests to Asset Assignments: One-to-one relationship. When a request is approved, it creates an assignment record.
+4. Employees to Asset Assignments: One-to-many relationship. An employee can have multiple assets assigned to them.
+5. Approval Hierarchy: Defines who can approve what types of assets for which departments, allowing for flexible approval workflows.
+
+Additional Features:
+1. Status Tracking: Both assets and requests have status fields to track their current state.
+2. Notification System: A dedicated table for system notifications to alert users of pending approvals, upcoming returns, etc.
+3. Maintenance Records: Track repairs, servicing, and other maintenance activities for assets.
+4. Historical Data: All tables include creation and update timestamps for audit trails.
+5. Flexible Approval Process: The system allows for different approval requirements based on department, asset type, and value.
+
+*Notes
+- client | employee -> update 
+	- onboarding(from Tumi) |
+	- login screen(from Tumi) | 
+	- profile screen(from Eliot) | 
+	- include email verification on employee signin and submit assetrequest
+	- use a tab-navigation-layout instead of a drawer-navigation
+	- dashboard
+		{ 
+			- remove notification?!
+				[ try push notification | toaster alert notification ]
+			- --- add a calendar view for upcoming asset returns ---
+			- displaying assets from Server
+				- ability to perform action on selected asset.
+				- navigation: 	-> to selected Asset Details on action "Review"
+								-> to RequestAsset form on action "Request Asset"
+								-> to Assets/inventory screen on press "Show More Assets"
+		}
+	- notifications screen
+	- assets inventory screen
+	- request asset form/screen
+	- asset details screen
+	- pending assets | my assets
+
+	
+
+- admin | management system 
+	-> clone and merge with main (from frankie)
+	-> update
+
+
+-Asset movement {
+    movement within the building(temp),
+    outside, permanent movement out
+}
+
+on AddAsset{
+remove-type
+damaged->Disposal
+}
+
+Assets Vs inventory
+- assets are the physical items
+- inventory is the list of assets

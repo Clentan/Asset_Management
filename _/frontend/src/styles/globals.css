@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Mochiy+Pop+P+One&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    font-family: "Poppins", sans-serif;
+}
+
+/* From Uiverse.io by benjimich */ 
+.loader {
+    width: 200px;
+    height: 10px;
+    border-radius: 50px;
+    overflow: hidden;
+  }
+  
+  .inner_loader {
+    width: 60%;
+    height: 100%;
+    background: #bdd147;
+    border-radius: 50px;
+    animation: moveLeftRight 3s ease-in-out infinite;
+  }
+  
+  @keyframes moveLeftRight {
+    0% {
+      transform: translateX(calc(-100% + 10px));
+    }
+  
+    50% {
+      transform: translateX(calc(200px - 10px));
+    }
+  
+    100% {
+      transform: translateX(calc(-100% + 10px));
+    }
+  }
